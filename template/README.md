@@ -42,6 +42,7 @@ You can find the most recent version of this guide [here](https://github.com/fac
   - [Node](#node)
   - [Ruby on Rails](#ruby-on-rails)
 - [Proxying API Requests in Development](#proxying-api-requests-in-development)
+  - ["Invalid Host Header" Errors After Configuring Proxy](#invalid-host-header-errors-after-configuring-proxy)
   - [Configuring the Proxy Manually](#configuring-the-proxy-manually)
 - [Using HTTPS in Development](#using-https-in-development)
 - [Generating Dynamic `<meta>` Tags on the Server](#generating-dynamic-meta-tags-on-the-server)
@@ -61,9 +62,6 @@ You can find the most recent version of this guide [here](https://github.com/fac
   - [Disabling jsdom](#disabling-jsdom)
   - [Snapshot Testing](#snapshot-testing)
   - [Editor Integration](#editor-integration)
-<!--
-- [Developing Components in Isolation](#developing-components-in-isolation)
--->
 - [Making a Progressive Web App](#making-a-progressive-web-app)
   - [Offline-First Considerations](#offline-first-considerations)
   - [Progressive Web App Metadata](#progressive-web-app-metadata)
@@ -900,6 +898,32 @@ If the `proxy` option is **not** flexible enough for you, alternatively you can:
 * Enable CORS on your server ([here’s how to do it for Express](http://enable-cors.org/server_expressjs.html)).
 * Use [environment variables](#adding-custom-environment-variables) to inject the right server host and port into your app.
 
+### "Invalid Host Header" Errors After Configuring Proxy
+
+When you enable the `proxy` option, you opt into a more strict set of host checks. This is necessary because leaving the backend open to remote hosts makes your computer vulnerable to DNS rebinding attacks. The issue is explained in [this article](https://medium.com/webpack/webpack-dev-server-middleware-security-issues-1489d950874a) and [this issue](https://github.com/webpack/webpack-dev-server/issues/887).
+
+This shouldn’t affect you when developing on `localhost`, but if you develop remotely like [described here](https://github.com/facebookincubator/create-react-app/issues/2271), you will see this error in the browser after enabling the `proxy` option:
+
+>Invalid Host header
+
+To work around it, you can specify your public development host in a file called `.env.development` in the root of your project:
+
+```
+HOST=mypublicdevhost.com
+```
+
+If you restart the development server now and load the app from the specified host, it should work.
+
+If you are still having issues or if you’re using a more exotic environment like a cloud editor, you can bypass the host check completely by adding a line to `.env.development.local`. **Note that this is dangerous and exposes your machine to remote code execution from malicious websites:**
+
+```
+# NOTE: THIS IS DANGEROUS!
+# It exposes your machine to attacks from the websites you visit.
+DANGEROUSLY_DISABLE_HOST_CHECK=true
+```
+
+We don’t recommend this approach.
+
 ### Configuring the Proxy Manually
 
 >Note: this feature is available with `react-scripts@1.0.0` and higher.
@@ -1379,7 +1403,7 @@ If your production web server does not support HTTPS, then the service worker
 registration will fail, but the rest of your web app will remain functional.
 
 1. Service workers are [not currently supported](https://jakearchibald.github.io/isserviceworkerready/)
-in all web browsers. Service worker registration [won't be attempted](src/service-worker-registration.js)
+in all web browsers. Service worker registration [won't be attempted](src/registerServiceWorker.js)
 on browsers that lack support.
 
 1. The service worker is only enabled in the [production environment](#deployment),
@@ -1395,7 +1419,7 @@ instructions for one way to test your production build locally and the [deployme
 instructions for using other methods. *Be sure to always use an
 incognito window to avoid complications with your browser cache.*
 
-1. If possible,configure your production environment to serve the generated
+1. If possible, configure your production environment to serve the generated
 `service-worker.js` [with HTTP caching disabled](http://stackoverflow.com/questions/38843970/service-worker-javascript-update-frequency-every-24-hours).
 If that's not possible—[GitHub Pages](#github-pages), for instance, does not
 allow you to change the default 10 minute HTTP cache lifetime—then be aware
@@ -1413,7 +1437,7 @@ app works offline!" message) and also let them know when the service worker has
 fetched the latest updates that will be available the next time they load the
 page (showing a "New content is available; please refresh." message). Showing
 this messages is currently left as an exercise to the developer, but as a
-starting point, you can make use of the logic included in [`src/service-worker-registration.js`](src/service-worker-registration.js), which
+starting point, you can make use of the logic included in [`src/registerServiceWorker.js`](src/registerServiceWorker.js), which
 demonstrates which service worker lifecycle events to listen for to detect each
 scenario, and which as a default, just logs appropriate messages to the
 JavaScript console.
@@ -1750,27 +1774,23 @@ When you build the project, Create React App will place the `public` folder cont
 
 ### Now
 
-[now](https://zeit.co/now) offers a zero-configuration single-command deployment.
+[now](https://zeit.co/now) offers a zero-configuration single-command deployment. You can use `now` to deploy your app for free.
 
 1. Install the `now` command-line tool either via the recommended [desktop tool](https://zeit.co/download) or via node with `npm install -g now`.
 
-2. Install `serve` by running `npm install --save serve`.
+2. Build your app by running `npm run build`.
 
-3. Add this line to `scripts` in `package.json`:
+3. Move into the build directory by running `cd build`.
 
-    ```
-    "now-start": "serve -s build/",
-    ```
-
-4. Run `now` from your project directory. You will see a **now.sh** URL in your output like this:
+4. Run `now --name your-project-name` from within the build directory. You will see a **now.sh** URL in your output like this:
 
     ```
-    > Ready! https://your-project-dirname-tpspyhtdtk.now.sh (copied to clipboard)
+    > Ready! https://your-project-name-tpspyhtdtk.now.sh (copied to clipboard)
     ```
 
     Paste that URL into your browser when the build is complete, and you will see your deployed app.
 
-Details are available in [this article.](https://zeit.co/blog/now-static)
+Details are available in [this article.](https://zeit.co/blog/unlimited-static)
 
 ### S3 and CloudFront
 

@@ -42,17 +42,33 @@ if (env.stringified['process.env'].NODE_ENV !== '"production"') {
   throw new Error('Production builds must have NODE_ENV=production.');
 }
 
-// Note: defined here because it will be used more than once.
+// Create two seperate files for css and cssmodules this allow for
+// different settings to be used with ExtractTextPlugin.
 const cssFilename = 'static/css/[name].[contenthash:8].css';
+const cssModulesFilename = 'static/css/[name]-cssmodules.[contenthash:8].css';
 
 // ExtractTextPlugin expects the build output to be flat.
 // (See https://github.com/webpack-contrib/extract-text-webpack-plugin/issues/27)
 // However, our output is structured with css, js and media folders.
 // To have this structure working with relative paths, we have to use custom options.
-const extractTextPluginOptions = shouldUseRelativeAssetPaths
+const extractTextPluginCSSOptions = shouldUseRelativeAssetPaths
   ? // Making sure that the publicPath goes back to to build folder.
-  { publicPath: Array(cssFilename.split('/').length).join('../') }
+    { publicPath: Array(cssFilename.split('/').length).join('../') }
   : {};
+
+const extractTextPluginCSSModulesOptions = shouldUseRelativeAssetPaths
+  ? // Making sure that the publicPath goes back to to build folder.
+  { publicPath: Array(cssModulesFilename.split('/').length).join('../') }
+  : {};
+
+const ExtractTextPluginCSS = new ExtractTextPlugin({
+  filename: cssFilename,
+})
+
+const ExtractTextPluginCSSModules = new ExtractTextPlugin({
+  filename: cssModulesFilename,
+  ignoreOrder: true,
+})
 
 // This is the production configuration.
 // It compiles slowly and is focused on producing a fast and minimal bundle.
@@ -96,7 +112,7 @@ module.exports = {
     // https://github.com/facebookincubator/create-react-app/issues/290
     // `web` extension prefixes have been added for better support
     // for React Native Web.
-    extensions: ['.web.js', '.js', '.json', '.web.jsx', '.jsx'],
+    extensions: ['.web.js', '.mjs', '.js', '.json', '.web.jsx', '.jsx'],
     alias: {
       // @remove-on-eject-begin
       // Resolve Babel runtime relative to react-scripts.
@@ -130,7 +146,7 @@ module.exports = {
       // First, run the linter.
       // It's important to do this before Babel processes the JS.
       {
-        test: /\.(js|jsx)$/,
+        test: /\.(js|jsx|mjs)$/,
         enforce: 'pre',
         use: [
           {
@@ -169,7 +185,7 @@ module.exports = {
           },
           // Process JS with Babel.
           {
-            test: /\.(js|jsx)$/,
+            test: /\.(js|jsx|mjs)$/,
             include: paths.appSrc,
             loader: require.resolve('babel-loader'),
             options: {
@@ -194,7 +210,7 @@ module.exports = {
           // in the main CSS file.
           {
             test: /\.module.css$/,
-            loader: ExtractTextPlugin.extract(
+            loader: ExtractTextPluginCSSModules.extract(
               Object.assign(
                 {
                   fallback: require.resolve('style-loader'),
@@ -204,7 +220,7 @@ module.exports = {
                       options: {
                         importLoaders: 1,
                         modules: true,
-                        localIdentName: '[path][name]__[local]',
+                        localIdentName: '[path]__[name]___[local]',
                         minimize: true,
                         sourceMap: shouldUseSourceMap,
                       },
@@ -231,18 +247,23 @@ module.exports = {
                     },
                   ],
                 },
-                extractTextPluginOptions
+                extractTextPluginCSSModulesOptions
               )
             ),
-            // Note: this won't work without `new ExtractTextPlugin()` in `plugins`.
+            // Note: this won't work without `ExtractTextPluginCSSModules` in `plugins`.
           },
           {
             test: /\.css$/,
             exclude: /\.module\.css$/,
-            loader: ExtractTextPlugin.extract(
+            loader: ExtractTextPluginCSS.extract(
               Object.assign(
                 {
-                  fallback: require.resolve('style-loader'),
+                  fallback: {
+                    loader: require.resolve('style-loader'),
+                    options: {
+                      hmr: false,
+                    },
+                  },
                   use: [
                     {
                       loader: require.resolve('css-loader'),
@@ -274,10 +295,10 @@ module.exports = {
                     },
                   ],
                 },
-                extractTextPluginOptions
+                extractTextPluginCSSOptions
               )
             ),
-            // Note: this won't work without `new ExtractTextPlugin()` in `plugins`.
+            // Note: this won't work without `ExtractTextPluginCSS` in `plugins`.
           },
           // "file" loader makes sure assets end up in the `build` folder.
           // When you `import` an asset, you get its filename.
@@ -339,6 +360,9 @@ module.exports = {
         // https://github.com/mishoo/UglifyJS2/issues/2011
         comparisons: false,
       },
+      mangle: {
+        safari10: true,
+      },
       output: {
         comments: false,
         // Turned on because emoji and regex is not minified properly using default
@@ -348,10 +372,10 @@ module.exports = {
       sourceMap: shouldUseSourceMap,
     }),
     // Note: this won't work without ExtractTextPlugin.extract(..) in `loaders`.
-    new ExtractTextPlugin({
-      filename: cssFilename,
-      ignoreOrder: true,
-    }),
+    // We have two ExtractTextPlugins to allow for different settings for
+    // cssmodules and regular css
+    ExtractTextPluginCSS,
+    ExtractTextPluginCSSModules,
     // Generate a manifest file which contains a mapping of all asset filenames
     // to their corresponding output file so that tools can pick it up without
     // having to parse `index.html`.
